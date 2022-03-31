@@ -19,6 +19,7 @@
 #define TAG "MQTT"
 #define MAC "MAC"
 
+
 xQueueHandle readingQueue;
 TaskHandle_t taskHandle;
 
@@ -26,13 +27,14 @@ const uint32_t WIFI_CONNEECTED = BIT1;
 const uint32_t MQTT_CONNECTED = BIT2;
 const uint32_t MQTT_PUBLISHED = BIT3;
 
+
 void mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
 {
   switch (event->event_id)
   {
   case MQTT_EVENT_CONNECTED:
     ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
-    xTaskNotify(taskHandle, MQTT_CONNECTED, eSetValueWithOverwrite);
+    // xTaskNotify(taskHandle, MQTT_CONNECTED, eSetValueWithOverwrite);
     break;
   case MQTT_EVENT_DISCONNECTED:
     ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
@@ -109,43 +111,51 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 {
   mqtt_event_handler_cb(event_data);
 }
-
-void task_manager(void *para)
+void mqttInit(void)
 {
-  uint32_t command = 0;
   esp_mqtt_client_config_t mqttConfig = {
-    //   .uri = "mqtt://test.mosquitto.org:1883"};
-      .uri = "mqtt://mqtt.eclipseprojects.io"};
+      .uri = "mqtt://test.mosquitto.org:1883"};
+      // .uri = "mqtt://mqtt.eclipseprojects.io"};
   esp_mqtt_client_handle_t client = NULL;
+  client = esp_mqtt_client_init(&mqttConfig);
+  esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, client);
+  esp_mqtt_client_start(client);
 
-  while (true)
-  {
-    xTaskNotifyWait(0, 0, &command, portMAX_DELAY);
-    switch (command)
-    {
-    case WIFI_CONNEECTED:
-      client = esp_mqtt_client_init(&mqttConfig);
-      esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, client);
-      esp_mqtt_client_start(client);
-      break;
-    case MQTT_CONNECTED:
-      esp_mqtt_client_subscribe(client, "/led", 0);
-    //   char data[50];
-    //   sprintf(data, "%d", 1);
-    //   esp_mqtt_client_publish(client, "/error", data, strlen(data), 0, false);
-
-      break;
-   
-    default:
-      break;
-    }
-  }
 }
+
+// void task_manager(void *para)
+// {
+//   uint32_t command = 0;
+  
+
+//   while (true)
+//   {
+//     xTaskNotifyWait(0, 0, &command, portMAX_DELAY);
+//     switch (command)
+//     {
+//     case WIFI_CONNEECTED:
+
+//       break;
+//     case MQTT_CONNECTED:
+//       esp_mqtt_client_subscribe(client, "/led", 0);
+//     //   char data[50];
+//     //   sprintf(data, "%d", 1);
+//     //   esp_mqtt_client_publish(client, "/error", data, strlen(data), 0, false);
+
+//       break;
+   
+//     default:
+//       break;
+//     }
+//   }
+// }
 
 void app_main()
 {
-
+  binSemaphore = xSemaphoreCreateBinary();
   wifiInit();
-  xTaskCreate(task_manager, "manager", 1024 * 5, NULL, 5, &taskHandle);
+  xSemaphoreTake(binSemaphore, portMAX_DELAY);
+  mqttInit();
+  // xTaskCreate(task_manager, "manager", 1024 * 5, NULL, 5, &taskHandle);
 
 }
